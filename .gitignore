@@ -1,0 +1,30 @@
+# Node.js dependencies
+node_modules/
+
+# TypeScript build output directories
+dist/
+build/
+
+# IDE configuration files
+.vscode/
+.idea/
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+
+# Environment variable files (sensitive data)
+.env
+.env.local
+.env.*.local
+
+# Backup files
+*.bak
+
+# Temporary files created by editors
+*.swp
+
+# TypeScript build info files
+*.tsbuildinfo
