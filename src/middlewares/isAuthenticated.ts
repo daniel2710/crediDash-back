@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express'
-import { merge } from 'lodash'
-import { getUserBySessionToken } from '../methods/user' 
+import { merge } from 'lodash' 
+import { UserSchema } from '../schemas/users'
 
 export const isAuthenticated = async (req: Request, res: Response, next: NextFunction) =>{
     try {
@@ -10,7 +10,10 @@ export const isAuthenticated = async (req: Request, res: Response, next: NextFun
             return res.sendStatus(403)
         }
 
-        const existingUser = await getUserBySessionToken(sessionToken)
+        const existingUser = await UserSchema.findOne({
+            'authentication.sessionToken': sessionToken
+        })
+
         if(!existingUser){
             console.log("No user exists")
             return res.sendStatus(403)

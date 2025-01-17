@@ -1,13 +1,13 @@
 import { Request, Response } from 'express';
-import { getUsers } from '../methods/user';
 import { paginate } from '../helpers/pagination';
+import { UserSchema } from '../schemas/users';
 
 export const getAllUsers = async (req: Request, res: Response) => {
   const currentPage = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 15;
 
   try {
-    const users = await getUsers();
+    const users = await UserSchema.find();
     const paginatedResult = paginate(users, currentPage, limit, 'users');
 
     // Si no hay resultados en la página actual, devuelve un error
@@ -36,6 +36,72 @@ export const getAllUsers = async (req: Request, res: Response) => {
     return res.status(400).json({
       status: 'error',
       message: 'Failed to fetch users',
+    });
+  }
+};
+
+export const getUserByIdController = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({
+        status: 'failed',
+        message: 'User ID is required',
+      });
+    }
+
+    const user = await UserSchema.findById({ _id: id })
+    if (!user) {
+      return res.status(404).json({
+        status: 'failed',
+        message: 'User not found',
+      });
+    }
+
+    return res.status(200).json({
+      status: 'success',
+      user,
+    });
+  } catch (error) {
+    console.error('Error finding user by ID:', error);
+    return res.status(500).json({
+      status: 'failed',
+      message: 'An unexpected error occurred',
+    });
+  }
+};
+
+export const getUserByWorkspaceId = async (req: Request, res: Response) => {
+  try {
+    const { workspaceId } = req.params;
+
+    if (!workspaceId) {
+      return res.status(400).json({
+        status: 'failed',
+        message: 'workspaceId is required',
+      });
+    }
+
+    // Encontrar usuario y poblar información del workspace
+    const user = await UserSchema.findOne({ workspaceId }).populate('workspaceId'); 
+
+    if (!user) {
+      return res.status(404).json({
+        status: 'failed',
+        message: 'User not found',
+      });
+    }
+
+    return res.status(200).json({
+      status: 'success',
+      user,
+    });
+  } catch (error) {
+    console.error('Error finding users by workspace ID:', error);
+    return res.status(500).json({
+      status: 'failed',
+      message: 'An unexpected error occurred',
     });
   }
 };

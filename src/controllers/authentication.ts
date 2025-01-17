@@ -1,8 +1,11 @@
 import { Request, Response } from 'express';
-import { getUserByEmail } from '../methods/user';
 import { authentication, randomToken } from '../helpers';
 import { UserSchema } from '../schemas/users';
 import { WorkspaceSchema } from '../schemas/workspaces';
+
+export const getUserByEmail = (email: string) =>{
+    return UserSchema.findOne({ email })
+}
 
 export const sign_in = async (req: Request, res: Response) => {
     try {
