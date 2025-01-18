@@ -92,68 +92,6 @@ export const createClient = async (req: Request, res: Response) => {
     }
 };
 
-export const deleteClient = async (req: Request, res: Response) => {
-  try {
-    const { clientId, userId } = req.params;
-
-    // Validar si clientId y userId son ObjectId válidos
-    if (!mongoose.Types.ObjectId.isValid(clientId)) {
-      return res.status(400).json({
-        status: "failed",
-        message: "Invalid clientId format.",
-      });
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({
-        status: "failed",
-        message: "Invalid userId format.",
-      });
-    }
-
-    // Buscar cliente por clientId
-    const client = await ClientSchema.findById(clientId);
-    if (!client) {
-      return res.status(404).json({
-        status: "failed",
-        message: "Client not found.",
-      });
-    }
-
-    // Verificar si el workspace del cliente existe
-    const workspace = await WorkspaceSchema.findById(client.workspaceId);
-    if (!workspace) {
-      return res.status(404).json({
-        status: "failed",
-        message: "Workspace not found.",
-      });
-    }
-
-    // Verificar si el workspace pertenece al usuario
-    if (!workspace.userId!.equals(new mongoose.Types.ObjectId(userId))) {
-      return res.status(403).json({
-        status: "failed",
-        message: "This workspace does not belong to this user.",
-      });
-    }
-
-    // Eliminar cliente
-    await ClientSchema.findByIdAndDelete(clientId);
-
-    return res.status(200).json({
-      status: "success",
-      message: "Client deleted successfully.",
-      client
-    });
-  } catch (error) {
-    console.error("Error deleting client:", error);
-    return res.status(500).json({
-      status: "failed",
-      message: "An unexpected error occurred.",
-    });
-  }
-};
-
 export const getAllClientsByWorkspace = async (req: Request, res: Response) => {
   const currentPage = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 15;
@@ -250,6 +188,68 @@ export const getClientById = async (req: Request, res: Response) => {
     return res.status(500).json({
       status: 'failed',
       message: 'An unexpected error occurred',
+    });
+  }
+};
+
+export const deleteClient = async (req: Request, res: Response) => {
+  try {
+    const { clientId, userId } = req.params;
+
+    // Validar si clientId y userId son ObjectId válidos
+    if (!mongoose.Types.ObjectId.isValid(clientId)) {
+      return res.status(400).json({
+        status: "failed",
+        message: "Invalid clientId format.",
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        status: "failed",
+        message: "Invalid userId format.",
+      });
+    }
+
+    // Buscar cliente por clientId
+    const client = await ClientSchema.findById(clientId);
+    if (!client) {
+      return res.status(404).json({
+        status: "failed",
+        message: "Client not found.",
+      });
+    }
+
+    // Verificar si el workspace del cliente existe
+    const workspace = await WorkspaceSchema.findById(client.workspaceId);
+    if (!workspace) {
+      return res.status(404).json({
+        status: "failed",
+        message: "Workspace not found.",
+      });
+    }
+
+    // Verificar si el workspace pertenece al usuario
+    if (!workspace.userId!.equals(new mongoose.Types.ObjectId(userId))) {
+      return res.status(403).json({
+        status: "failed",
+        message: "This workspace does not belong to this user.",
+      });
+    }
+
+    // Eliminar cliente
+    await ClientSchema.findByIdAndDelete(clientId);
+
+    return res.status(200).json({
+      status: "success",
+      message: "Client deleted successfully.",
+      client
+    });
+  } catch (error) {
+    console.error("Error deleting client:", error);
+    return res.status(500).json({
+      status: "failed",
+      message: "An unexpected error occurred.",
     });
   }
 };
