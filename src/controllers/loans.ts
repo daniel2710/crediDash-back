@@ -6,37 +6,57 @@ import { validateObjectId } from "../helpers/validateMongo";
 import { paginate } from "../helpers/pagination";
 
 export const createLoan = async (req: Request, res: Response) => {
+
     try {
+
         const {
             workspaceId,
             clientId,
             status,
-            name,
             description,
             amount,
             interest,
-            start_date,
-            end_date,
+            installments_qty,
             payment_method,
         } = req.body;
 
-        // Verificar que todos los campos sean enviados
+        // Validar campos obligatorios
+        const missingFields = [];
+        if (!workspaceId) missingFields.push('workspaceId');
+        if (!clientId) missingFields.push('clientId');
+        if (!status) missingFields.push('status');
+        if (!description) missingFields.push('description');
+        if (amount === undefined) missingFields.push('amount');
+        if (interest === undefined) missingFields.push('interest');
+        if (installments_qty === undefined) missingFields.push('installments_qty');
         if (
-            !workspaceId ||
-            !clientId ||
-            !status ||
-            !name ||
-            !description ||
-            !amount ||
-            !interest ||
-            !start_date ||
-            !end_date ||
-            !payment_method
-        ) {
+            payment_method !== 'diary' &&
+            payment_method !== 'monthly' &&
+            payment_method !== 'weekly' &&
+            payment_method !== 'fortnightly'
+        ) missingFields.push('payment_method');
+
+        if (missingFields.length > 0) {
             return res.status(400).json({
-                status: "failed",
-                message: "All fields are required",
+                status: 'failed',
+                message: `Missing or invalid fields: ${missingFields.join(', ')}`
             });
+        }
+
+        // Validar que los campos numéricos tengan valores válidos
+        const numericFields = {
+            amount,
+            interest,
+            installments_qty,
+        };
+
+        for (const [field, value] of Object.entries(numericFields)) {
+            if (typeof value !== "number" || isNaN(value) || value < 0) {
+                return res.status(400).json({
+                    status: "failed",
+                    message: `Invalid or missing numeric value for field: ${field}`,
+                });
+            }
         }
 
         // Validar que el workspaceId y clientId sea válido
@@ -72,30 +92,68 @@ export const createLoan = async (req: Request, res: Response) => {
             });
         }
 
+        // Calcular montos
+        const totalAmount = amount + amount * (interest / 100);
+        const amountPerQuota = totalAmount / installments_qty;
+
+        // Crear cuotas
+        const installments = [];
+        const now = new Date();
+
+        for (let i = 0; i < installments_qty; i++) {
+            // Crear una nueva instancia de la fecha para evitar referencias compartidas
+            const installmentDate = new Date(now);
+
+            // Ajustar la fecha según el método de pago
+            switch (payment_method) {
+                case 'diary':
+                    installmentDate.setDate(now.getDate() + i + 1); // Comienza desde el día siguiente
+                    break;
+                case 'weekly':
+                    installmentDate.setDate(now.getDate() + (i + 1) * 7); // Comienza desde el día siguiente y se incrementa de 7 en 7 días
+                    break;
+                case 'fortnightly':
+                    installmentDate.setDate(now.getDate() + (i + 1) * 15); // Comienza desde el día siguiente y se incrementa de 15 en 15 días
+                    break;
+                case 'monthly':
+                    installmentDate.setDate(now.getDate() + (i + 1) * 30); // Comienza desde el día siguiente y se incrementa de 15 en 15 días
+                    break;
+                default:
+                    throw new Error(`Invalid payment method: ${payment_method}`);
+            }
+
+            installments.push({
+                status: 'pending',
+                amount: amountPerQuota,
+                payment_date: null,
+                end_date: new Date(installmentDate),
+            });
+        }
+
         // Crear el préstamo
         const newLoan = new LoansSchema({
             workspaceId,
             clientId,
             status,
-            name,
             description,
             amount,
             interest,
-            start_date,
-            end_date,
+            installments_qty,
+            installments_info: { paid_installments: 0 },
+            installments,
+            payment_actual: 0,
+            payment_missing: totalAmount,
             payment_method,
         });
 
-        // Guardar el préstamo en la base de datos
         await newLoan.save();
 
         return res.status(201).json({
             status: "success",
-            message: "Loan created successfully",
+            message: "Loan and installments created successfully",
             loan: newLoan,
         });
     } catch (error) {
-        console.error("Error creating loan:", error);
         return res.status(500).json({
             status: "failed",
             message: "An unexpected error occurred",
@@ -179,7 +237,7 @@ export const getAllLoansByClientId = async (req: Request, res: Response) => {
 
 export const updateLoan = async (req: Request, res: Response) => {
     const { workspaceId, loanId } = req.params; // ID del préstamo a actualizar
-    const { name, description, end_date, payment_method } = req.body; // Campos a actualizar
+    const { description, payment_method } = req.body; // Campos a actualizar
 
     try {
         // Validar que el loanId sea válido
@@ -217,9 +275,7 @@ export const updateLoan = async (req: Request, res: Response) => {
         }
 
         // Actualizar solo los campos recibidos en el cuerpo de la solicitud
-        if (name) loan.name = name;
         if (description) loan.description = description;
-        if (end_date) loan.end_date = end_date;
         if (payment_method) loan.payment_method = payment_method;
 
         // Guardar los cambios en el préstamo
