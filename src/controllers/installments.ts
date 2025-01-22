@@ -113,6 +113,13 @@ export const payInstallment = async (req: Request, res: Response) => {
             (inst) => inst.status === "liquidated"
         ).length;
 
+        // Registrar la historia del pago
+        loan.history.push({
+            payment_date: new Date(),
+            payment: paymentAmount,
+            remaining_balance: loan.payment_missing
+        });
+
         await loan.save();
 
         return res.status(201).json({

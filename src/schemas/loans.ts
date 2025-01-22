@@ -13,6 +13,12 @@ const InstallmentSchema = new mongoose.Schema({
     end_date: { type: Date, default: Date.now },
 });
 
+const HistorySchema = new mongoose.Schema({
+    payment_date: { type: Date, default: Date.now }, // Fecha del abono
+    payment: { type: Number, required: true }, // Monto del abono
+    remaining_balance: { type: Number, required: true }, // Saldo restante tras el abono
+});
+
 const Loans = new mongoose.Schema({
     workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace' },
     clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Client' },
@@ -30,6 +36,7 @@ const Loans = new mongoose.Schema({
         paid_installments: { type: Number, required: true, default: 0 }, // total de cuotas pagadas
     },
     installments: [InstallmentSchema],
+    history: [HistorySchema],
     payment_actual: { type: Number, required: true },
     payment_missing: { type: Number, required: true },
     payment_method: {
