@@ -1,6 +1,12 @@
 import { Router } from "express";
 import { isAuthenticated } from "../middlewares/isAuthenticated";
-import { createClient, deleteClient, getAllClientsByWorkspace, getClientById, updateClientById } from "../controllers/clients";
+import {
+    createClient,
+    deleteClient,
+    getAllClientsByWorkspace,
+    getClientById,
+    updateClientById
+} from "../controllers/clients";
 
 export default (router: Router) =>{
     router.get('/clients/:workspaceId', isAuthenticated, getAllClientsByWorkspace);

@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 
 const User = new mongoose.Schema({
     workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace' },
+    company_name: { type: String, required: true, default: 'Mi empresa', },
     name: { type: String, required: true },
     lastname: { type: String, required: true },
     email: { type: String, required: true, unique: true },

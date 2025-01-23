@@ -1,12 +1,12 @@
 import { Request, Response } from 'express';
-import { authentication, randomToken } from '../helpers';
-import { UserSchema } from '../schemas/users';
+import { UserSchema } from '../../schemas/users';
+import { authentication, randomToken } from '../../helpers';
 
 export const getUserByEmail = (email: string) =>{
     return UserSchema.findOne({ email })
 }
 
-export const sign_in = async (req: Request, res: Response) => {
+export const signIn = async (req: Request, res: Response) => {
     try {
         const { email, password } = req.body;
 
@@ -63,4 +63,3 @@ export const sign_in = async (req: Request, res: Response) => {
         });
     }
 };
-

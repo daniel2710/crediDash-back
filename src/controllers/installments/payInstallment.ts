@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
-import { validateObjectId } from "../helpers/validateMongo";
-import { WorkspaceSchema } from "../schemas/workspaces";
-import { LoansSchema } from "../schemas/loans";
+import { validateObjectId } from "../../helpers/validateMongo";
+import { WorkspaceSchema } from "../../schemas/workspaces";
+import { LoansSchema } from "../../schemas/loans";
 
 export const payInstallment = async (req: Request, res: Response) => {
 

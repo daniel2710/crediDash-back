@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { sign_in } from "../controllers/authentication";
+import { signIn } from "../controllers/auth";
 
 export default (router: Router) => {
-    router.post('/signin', sign_in);
+    router.post('/signin', signIn);
 }

@@ -1,0 +1,5 @@
+export { createLoan } from './createLoan'
+export { getAllLoansByClient } from './getAllLoansByClient'
+export { getAllLoansByWorkspace } from './getAllLoansByWorkspace'
+export { updateLoanById } from './updateLoanById'
+export { payLoanAsLiquidated } from './payLoanAsLiquidated'
