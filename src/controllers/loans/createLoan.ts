@@ -145,6 +145,20 @@ export const createLoan = async (req: Request, res: Response) => {
 
         await newLoan.save();
 
+        // Actualizar las estadísticas en workspace.stats
+        await WorkspaceSchema.findByIdAndUpdate(
+            workspaceId,
+            { 
+                $inc: {
+                    "stats.total_loans": 1,
+                    "stats.active_loans": 1,
+                    "stats.total_lents": amount,
+                    "stats.total_pending": totalAmount
+                }
+            },
+            { new: true }
+        );
+
         return res.status(201).json({
             status: "success",
             message: "Loan and installments created successfully",

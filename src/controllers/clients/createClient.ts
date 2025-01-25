@@ -77,6 +77,13 @@ export const createClient = async (req: Request, res: Response) => {
 
         await newClient.save();
 
+        // Actualizar el total de clientes en workspace.stats
+        await WorkspaceSchema.findByIdAndUpdate(
+            workspaceId,
+            { $inc: { "stats.total_clients": 1 } },
+            { new: true }
+        );
+
         return res.status(201).json({
             status: "success",
             message: "Client created successfully.",

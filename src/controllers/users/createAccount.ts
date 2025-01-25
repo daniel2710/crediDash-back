@@ -69,6 +69,13 @@ export const create_account = async (req: Request, res: Response) => {
             userId: savedUser._id,
             plan: 'free',  // O según los parámetros de tu app
             interface_config: { theme: 'light' }, // Puedes ajustarlo según lo que necesites
+            stats: {
+                total_loans: 0,
+                total_clients: 0,
+                total_lents: 0, // total de egresos
+                total_incomes: 0, // total de ingresos
+                total_pending: 0, // total de cartera
+            },
         });
   
         const savedWorkspace = await newWorkspace.save();

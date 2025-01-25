@@ -122,6 +122,29 @@ export const payInstallment = async (req: Request, res: Response) => {
 
         await loan.save();
 
+        // Actualizar las estadísticas en workspace.stats
+        await WorkspaceSchema.findByIdAndUpdate(
+            workspaceId,
+            {
+                $inc: {
+                    // Reducir los préstamos activos si el préstamo fue liquidado.
+                    "stats.active_loans":
+                        loan.status === "liquidated" ? -1 : 0,
+
+                    // Aumentamos el total liquidado si el préstamo fue liquidado.
+                    "stats.liquidate_loans":
+                        loan.status === "liquidated" ? 1 : 0,
+
+                    // Aumentamos los ingresos por el monto total pagado independiente si el préstamo fue liquidado o no.
+                    "stats.total_incomes": paymentAmount,
+                    
+                    // reducimos la cartera por el monto total pagado independiente si el préstamo fue liquidado o no.
+                    "stats.total_pending": -paymentAmount,
+                },
+            },
+            { new: true }
+        );
+
         return res.status(201).json({
             status: "success",
             message: "Payment processed successfully",
