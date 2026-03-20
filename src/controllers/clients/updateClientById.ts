@@ -1,54 +1,20 @@
 import { Request, Response } from "express";
-import { ClientSchema } from "../../schemas/clients";
-import { WorkspaceSchema } from "../../schemas/workspaces";
+import { updateClientById as updateClientService } from "../../services/clients/updateClientById.service";
 
 export const updateClientById = async (req: Request, res: Response) => {
     try {
-      const { clientId, workspaceId } = req.params; // ID del cliente a modificar
-      const updateData = req.body; // Datos a actualizar
-  
-      // Verificar que el workspaceId esté presente
+      const { clientId, workspaceId } = req.params;
+      const updateData = req.body;
+
       if (!workspaceId) {
         return res.status(400).json({
           status: "failed",
           message: "workspaceId is required",
         });
       }
-      
-      // Verificar si el workspaceId es válido (opcional, si deseas más seguridad)
-      const workspace = await WorkspaceSchema.findById(workspaceId);
-      if (!workspace) {
-        return res.status(404).json({
-          status: "failed",
-          message: "Workspace not found",
-        });
-      }
-  
-      // Verificar si el cliente existe
-      const client = await ClientSchema.findById({ _id: clientId });
-      if (!client) {
-        return res.status(404).json({
-          status: "failed",
-          message: "Client not found",
-        });
-      }
-  
-      // Verificar que el workspaceId pertenece al cliente
-      if (client.workspaceId!.toString() !== workspaceId) {
-        return res.status(403).json({
-          status: "failed",
-          message: "Client does not belong to the provided workspace",
-        });
-      }
-  
-      // Actualizar el cliente con los datos enviados
-      const updatedClient = await ClientSchema.findByIdAndUpdate(
-        clientId,
-        updateData,
-        { new: true, runValidators: true }
-      );
-  
-      // Devolver el cliente actualizado
+
+      const updatedClient = await updateClientService(clientId, workspaceId, updateData);
+
       return res.status(200).json({
         status: "success",
         message: "Client updated successfully",
@@ -56,9 +22,17 @@ export const updateClientById = async (req: Request, res: Response) => {
       });
     } catch (error) {
       console.error("Error updating client:", error);
-      return res.status(500).json({
+      
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      let statusCode = 500;
+
+      if (errorMessage === 'Workspace not found') statusCode = 404;
+      else if (errorMessage === 'Client not found') statusCode = 404;
+      else if (errorMessage === 'Client does not belong to the provided workspace') statusCode = 403;
+
+      return res.status(statusCode).json({
         status: "failed",
-        message: "An unexpected error occurred",
+        message: errorMessage,
       });
     }
   };

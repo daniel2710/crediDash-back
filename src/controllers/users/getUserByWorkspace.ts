@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { UserSchema } from "../../schemas/users";
+import { findUserByWorkspace } from "../../services/users/getUserByWorkspace.service";
 
 export const getUserByWorkspace = async (req: Request, res: Response) => {
     try {
@@ -12,15 +12,7 @@ export const getUserByWorkspace = async (req: Request, res: Response) => {
         });
       }
   
-      // Encontrar usuario y poblar información del workspace
-      const user = await UserSchema.findOne({ workspaceId }).populate('workspaceId'); 
-  
-      if (!user) {
-        return res.status(404).json({
-          status: 'failed',
-          message: 'User not found',
-        });
-      }
+      const user = await findUserByWorkspace(workspaceId);
   
       return res.status(200).json({
         status: 'success',
@@ -28,9 +20,13 @@ export const getUserByWorkspace = async (req: Request, res: Response) => {
       });
     } catch (error) {
       console.error('Error finding users by workspace ID:', error);
-      return res.status(500).json({
+      
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      const statusCode = errorMessage === 'User not found' ? 404 : 500;
+      
+      return res.status(statusCode).json({
         status: 'failed',
-        message: 'An unexpected error occurred',
+        message: errorMessage,
       });
     }
   };

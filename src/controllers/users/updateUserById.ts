@@ -1,54 +1,20 @@
 import { Request, Response } from "express";
-import { UserSchema } from "../../schemas/users";
-import { WorkspaceSchema } from "../../schemas/workspaces";
+import { updateUser } from "../../services/users/users.service";
 
 export const updateUserById = async (req: Request, res: Response) => {
     try {
-      const { idUser, workspaceId } = req.params; // ID del usuario a modificar
-      const updateData = req.body; // Datos a actualizar
-  
-      // Verificar que workspaceId esté presente
+      const { idUser, workspaceId } = req.params;
+      const updateData = req.body;
+
       if (!workspaceId) {
         return res.status(400).json({
           status: "failed",
           message: "workspaceId is required in params",
         });
       }
-  
-      // Verificar si el usuario existe
-      const user = await UserSchema.findById(idUser);
-      if (!user) {
-        return res.status(404).json({
-          status: "failed",
-          message: "User not found",
-        });
-      }
-  
-      // Verificar si el workspace existe
-      const workspace = await WorkspaceSchema.findById(workspaceId);
-      if (!workspace) {
-        return res.status(404).json({
-          status: "failed",
-          message: "Workspace not found",
-        });
-      }
-  
-      // Verificar que el workspace le pertenece al usuario
-      if (workspace.userId!.toString() !== user._id.toString()) {
-        return res.status(403).json({
-          status: "failed",
-          message: "Workspace does not belong to the specified user",
-        });
-      }
-  
-      // Actualizar el usuario con los datos enviados
-      const updatedUser = await UserSchema.findByIdAndUpdate(
-        idUser,
-        updateData,
-        { new: true, runValidators: true }
-      );
-  
-      // Devolver el usuario actualizado
+
+      const updatedUser = await updateUser(idUser, workspaceId, updateData);
+
       return res.status(200).json({
         status: "success",
         message: "User updated successfully",
@@ -56,9 +22,17 @@ export const updateUserById = async (req: Request, res: Response) => {
       });
     } catch (error) {
       console.error("Error updating user:", error);
-      return res.status(500).json({
+      
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      let statusCode = 500;
+      
+      if (errorMessage === 'User not found') statusCode = 404;
+      else if (errorMessage === 'Workspace not found') statusCode = 404;
+      else if (errorMessage === 'Workspace does not belong to the specified user') statusCode = 403;
+
+      return res.status(statusCode).json({
         status: "failed",
-        message: "An unexpected error occurred",
+        message: errorMessage,
       });
     }
   };

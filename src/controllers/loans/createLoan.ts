@@ -15,6 +15,7 @@ export const createLoan = async (req: Request, res: Response) => {
             interest,
             installments_qty,
             payment_method,
+            start_date,
         } = req.body;
 
         // Validar campos obligatorios
@@ -95,25 +96,26 @@ export const createLoan = async (req: Request, res: Response) => {
 
         // Crear cuotas
         const installments = [];
-        const now = new Date();
+        // Usar start_date si se proporciona, de lo contrario usar la fecha actual
+        const baseDate = start_date ? new Date(start_date) : new Date();
 
         for (let i = 0; i < installments_qty; i++) {
             // Crear una nueva instancia de la fecha para evitar referencias compartidas
-            const installmentDate = new Date(now);
+            const installmentDate = new Date(baseDate);
 
             // Ajustar la fecha según el método de pago
             switch (payment_method) {
                 case 'diary':
-                    installmentDate.setDate(now.getDate() + i + 1); // Comienza desde el día siguiente
+                    installmentDate.setDate(baseDate.getDate() + i + 1); // Comienza desde el día siguiente
                     break;
                 case 'weekly':
-                    installmentDate.setDate(now.getDate() + (i + 1) * 7); // Comienza desde el día siguiente y se incrementa de 7 en 7 días
+                    installmentDate.setDate(baseDate.getDate() + (i + 1) * 7); // Comienza desde el día siguiente y se incrementa de 7 en 7 días
                     break;
                 case 'fortnightly':
-                    installmentDate.setDate(now.getDate() + (i + 1) * 15); // Comienza desde el día siguiente y se incrementa de 15 en 15 días
+                    installmentDate.setDate(baseDate.getDate() + (i + 1) * 15); // Comienza desde el día siguiente y se incrementa de 15 en 15 días
                     break;
                 case 'monthly':
-                    installmentDate.setDate(now.getDate() + (i + 1) * 30); // Comienza desde el día siguiente y se incrementa de 15 en 15 días
+                    installmentDate.setDate(baseDate.getDate() + (i + 1) * 30); // Comienza desde el día siguiente y se incrementa de 30 en 30 días
                     break;
                 default:
                     throw new Error(`Invalid payment method: ${payment_method}`);
@@ -141,6 +143,7 @@ export const createLoan = async (req: Request, res: Response) => {
             payment_actual: 0,
             payment_missing: totalAmount,
             payment_method,
+            start_date: start_date ? new Date(start_date) : new Date(),
         });
 
         await newLoan.save();

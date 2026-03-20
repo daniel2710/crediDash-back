@@ -6,7 +6,7 @@ const User = new mongoose.Schema({
     name: { type: String, required: true },
     lastname: { type: String, required: true },
     email: { type: String, required: true, unique: true },
-    type: { type: String, enum: ['admin', 'reviewer'], required: true },
+    type: { type: String, enum: ['super', 'admin', 'reviewer'], required: true },
     authentication: {
         salt: { type: String, select: false },
         sessionToken: { type: String, select: false },

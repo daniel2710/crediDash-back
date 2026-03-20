@@ -1,28 +1,28 @@
 import { Request, Response } from "express";
-import { findUserById } from "../../services/users/getUserById.service";
+import { findWorkspaceById } from "../../services/workspaces/getWorkspaceById.service";
 
-export const getUserById = async (req: Request, res: Response) => {
+export const getWorkspaceById = async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-  
+
       if (!id) {
         return res.status(400).json({
           status: 'failed',
-          message: 'User ID is required',
+          message: 'Workspace ID is required',
         });
       }
-  
-      const user = await findUserById(id);
+
+      const workspace = await findWorkspaceById(id);
   
       return res.status(200).json({
         status: 'success',
-        user,
+        workspace,
       });
     } catch (error) {
-      console.error('Error finding user by ID:', error);
+      console.error('Error finding workspace by ID:', error);
       
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
-      const statusCode = errorMessage === 'User not found' ? 404 : 500;
+      const statusCode = errorMessage === 'Workspace not found' ? 404 : 500;
       
       return res.status(statusCode).json({
         status: 'failed',

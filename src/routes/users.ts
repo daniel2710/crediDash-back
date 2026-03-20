@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
-    create_account,
+    createUserAccount,
+    deleteUserAccount,
     getAllUsers,
     getUserById,
     getUserByWorkspace,
@@ -8,10 +9,11 @@ import {
 } from "../controllers/users";
 import { isAuthenticated } from "../middlewares/isAuthenticated";
 
-export default (router: Router) =>{
-    router.post('/create_account', create_account);
+export default (router: Router) => {
     router.get('/users', isAuthenticated, getAllUsers);
     router.get('/users/:id', isAuthenticated, getUserById);
-    router.get('/users/info/:workspaceId', isAuthenticated, getUserByWorkspace);
+    router.get('/users/workspace/:workspaceId', isAuthenticated, getUserByWorkspace);
+    router.post('/users/create_account', createUserAccount);
+    router.delete('/users/:workspaceId/:userId', isAuthenticated, deleteUserAccount);
     router.patch('/users/:workspaceId/:idUser', isAuthenticated, updateUserById);
-}   
+}

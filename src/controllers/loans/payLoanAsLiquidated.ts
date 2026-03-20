@@ -78,12 +78,14 @@ export const payLoanAsLiquidated = async (req: Request, res: Response) => {
         // Actualizar la información de cuotas pagadas
         loan.installments_info!.paid_installments = loan.installments.length;
 
-        // Agregar al historial
+        // Agregar al historial con información detallada
         loan.history = loan.history || []; // Inicializar si no existe
         loan.history.push({
             payment_date: new Date(),
             payment: remainingBalance, // Monto faltante para liquidar el préstamo
             remaining_balance: 0, // No hay saldo restante tras liquidar el préstamo
+            paid_installments: loan.installments_info!.paid_installments,
+            loan_status: "liquidated"
         });
 
         // Guardar cambios

@@ -1,7 +1,5 @@
 import { Request, Response } from "express";
-import mongoose from "mongoose";
-import { WorkspaceSchema } from "../../schemas/workspaces";
-import { ClientSchema } from "../../schemas/clients";
+import { createClientWithWorkspace } from "../../services/clients/createClient.service";
 
 export const createClient = async (req: Request, res: Response) => {
     try {
@@ -15,40 +13,9 @@ export const createClient = async (req: Request, res: Response) => {
             });
         }
 
-        // Validar el formato de ObjectId
-        if (!mongoose.Types.ObjectId.isValid(workspaceId)) {
-            return res.status(400).json({
-                status: "failed",
-                message: "Invalid workspaceId format.",
-            });
-        }
-
-        if (!mongoose.Types.ObjectId.isValid(userId)) {
-            return res.status(400).json({
-                status: "failed",
-                message: "Invalid userId format.",
-            });
-        }
-
-        // Verificar si el workspace existe y pertenece al usuario
-        const workspace = await WorkspaceSchema.findById(workspaceId);
-        if (!workspace) {
-            return res.status(404).json({
-                status: "failed",
-                message: "Workspace not found.",
-            });
-        }
-
-        if (!workspace.userId!.equals(new mongoose.Types.ObjectId(userId))) {
-            return res.status(403).json({
-                status: "failed",
-                message: "This workspace does not belong to the user.",
-            });
-        }
-
-        // Verificar si existe un cliente con exactamente los mismos datos
-        const duplicateClient = await ClientSchema.findOne({
+        const client = await createClientWithWorkspace({
             workspaceId,
+            userId,
             name,
             lastname,
             email,
@@ -56,44 +23,25 @@ export const createClient = async (req: Request, res: Response) => {
             address,
             description,
         });
-
-        if (duplicateClient) {
-            return res.status(400).json({
-                status: "failed",
-                message: "A client with the same exact data already exists.",
-            });
-        }
-
-        // Crear y guardar el nuevo cliente
-        const newClient = new ClientSchema({
-            workspaceId,
-            name,
-            lastname,
-            email,
-            phone,
-            address,
-            description,
-        });
-
-        await newClient.save();
-
-        // Actualizar el total de clientes en workspace.stats
-        await WorkspaceSchema.findByIdAndUpdate(
-            workspaceId,
-            { $inc: { "stats.total_clients": 1 } },
-            { new: true }
-        );
 
         return res.status(201).json({
             status: "success",
             message: "Client created successfully.",
-            client: newClient,
+            client,
         });
     } catch (error) {
         console.error("Error creating client:", error);
-        return res.status(500).json({
+        
+        const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+        let statusCode = 500;
+
+        if (errorMessage === 'Workspace not found') statusCode = 404;
+        else if (errorMessage === 'This workspace does not belong to the user') statusCode = 403;
+        else if (errorMessage === 'A client with the same exact data already exists') statusCode = 400;
+
+        return res.status(statusCode).json({
             status: "failed",
-            message: "An unexpected error occurred.",
+            message: errorMessage,
         });
     }
 };

@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const InstallmentSchema = new mongoose.Schema({
     status: {
         type: String,
-        enum: ['pending', 'liquidated', 'partial'],
+        enum: ['pending', 'liquidated', 'partial', 'late'],
         default: 'pending',
         required: true
     },
@@ -17,6 +17,8 @@ const HistorySchema = new mongoose.Schema({
     payment_date: { type: Date, default: Date.now }, // Fecha del abono
     payment: { type: Number, required: true }, // Monto del abono
     remaining_balance: { type: Number, required: true }, // Saldo restante tras el abono
+    paid_installments: { type: Number, required: true }, // Cuotas liquidadas hasta este momento
+    loan_status: { type: String, required: true }, // Estado del préstamo después del pago
 });
 
 const Loans = new mongoose.Schema({
@@ -24,7 +26,7 @@ const Loans = new mongoose.Schema({
     clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Client' },
     status: {
         type: String,
-        enum: ['pending', 'liquidated', 'partial'],
+        enum: ['pending', 'liquidated', 'partial', 'late'],
         default: 'pending',
         required: true
     },
@@ -45,6 +47,7 @@ const Loans = new mongoose.Schema({
         default: 'diary',
         required: true
     },
+    start_date: { type: Date, default: Date.now },
     createdAt: { type: Date, default: Date.now }
 })
 

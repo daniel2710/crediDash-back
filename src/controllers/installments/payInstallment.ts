@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { validateObjectId } from "../../helpers/validateMongo";
 import { WorkspaceSchema } from "../../schemas/workspaces";
 import { LoansSchema } from "../../schemas/loans";
+import { checkAndUpdateLateStatus } from "../../helpers/checkLateStatus";
 
 export const payInstallment = async (req: Request, res: Response) => {
 
@@ -65,9 +66,12 @@ export const payInstallment = async (req: Request, res: Response) => {
             });
         }
 
-        // Iterar sobre las cuotas pendientes
+        // Verificar y actualizar el estado de cuotas atrasadas antes de procesar el pago
+        const updatedLoan = await checkAndUpdateLateStatus(loanId);
+
+        // Iterar sobre las cuotas pendientes (usar el préstamo actualizado)
         let extraPayment = paymentAmount; // Cantidad a procesar (110.000)
-        const installments = loan.installments;
+        const installments = updatedLoan!.installments;
 
         // Recorremos todas las cuotas (installments) de un préstamo, y si el pago es menor a la cuota, lo procesamos y se abona, queda con el status 'partial' y se acaba el bucle ya que no queda dinero (extraPayment) para la siguiente cuota. Si el pago es mayor a la cuota, lo procesamos y se abona, queda con el status 'liquidated' y sigue el bucle hasta que la siguiente cuota quede como 'liquidate' y no quede más dinero (extraPayment).
         for (let i = 0; i < installments.length; i++) {
@@ -113,11 +117,13 @@ export const payInstallment = async (req: Request, res: Response) => {
             (inst) => inst.status === "liquidated"
         ).length;
 
-        // Registrar la historia del pago
+        // Registrar la historia del pago con información detallada
         loan.history.push({
             payment_date: new Date(),
             payment: paymentAmount,
-            remaining_balance: loan.payment_missing
+            remaining_balance: loan.payment_missing,
+            paid_installments: loan.installments_info!.paid_installments,
+            loan_status: loan.status
         });
 
         await loan.save();

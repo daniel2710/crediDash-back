@@ -4,6 +4,7 @@ import { WorkspaceSchema } from "../../schemas/workspaces";
 import { UserSchema } from "../../schemas/users";
 import { LoansSchema } from "../../schemas/loans";
 import { paginate } from "../../helpers/pagination";
+import { checkAndUpdateAllLateLoans } from "../../helpers/checkLateStatus";
 
 export const getAllLoansByWorkspace = async (req: Request, res: Response) => {
     const currentPage = parseInt(req.query.page as string) || 1;
@@ -44,6 +45,9 @@ export const getAllLoansByWorkspace = async (req: Request, res: Response) => {
                 message: "Workspace does not belong to the specified user",
             });
         }
+
+        // Actualizar el estado de préstamos atrasados antes de obtenerlos
+        await checkAndUpdateAllLateLoans(workspaceId);
 
         // Obtener los préstamos asociados al workspace
         const loans = await LoansSchema.find({ workspaceId }).populate("installments");
