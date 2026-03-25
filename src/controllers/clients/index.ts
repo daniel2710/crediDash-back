@@ -1,5 +1,5 @@
 export { createClient } from './createClient'
 export { deleteClient } from './deleteClient'
-export { getAllClientsByWorkspace } from './getAllClientByWorkspace'
+export { getAllClientsByWorkspace } from './getAllClientsByWorkspace'
 export { getClientById } from './getClientById'
 export { updateClientById } from './updateClientById'

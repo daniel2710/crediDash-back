@@ -5,6 +5,7 @@ import clients from './clients';
 import loans from './loans';
 import installments from './installments';
 import workspace from './workspace';
+import statistics from './statistics';
 
 const routes = Router();
 
@@ -15,5 +16,6 @@ export default (): Router =>{
     loans(routes)
     installments(routes)
     workspace(routes)
+    statistics(routes)
     return routes
 }

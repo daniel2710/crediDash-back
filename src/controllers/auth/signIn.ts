@@ -41,6 +41,7 @@ export const signIn = async (req: Request, res: Response) => {
         // Generar token de sesión
         const salt = randomToken();
         auth.sessionToken = authentication(salt, user._id.toString());
+        auth.tokenExpiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 horas
 
         await user.save();
 
@@ -48,11 +49,16 @@ export const signIn = async (req: Request, res: Response) => {
         res.cookie('CREDIDASH-AUTH', auth.sessionToken, {
             sameSite: 'none',
             secure: true,
+            maxAge: 8 * 60 * 60 * 1000, // 8 horas
         });
+
+        // Eliminar campos sensibles antes de enviar la respuesta
+        const userResponse = user.toObject();
+        delete userResponse.authentication;
 
         return res.status(200).json({ 
             status: 'success', 
-            user 
+            user: userResponse 
         });
 
     } catch (error) {

@@ -2,6 +2,7 @@ import express from 'express';
 import http from 'http';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
+import cors from 'cors';
 import connectToDatabase from './db/connection';
 import routes from './routes';
 import requestLogger from './middlewares/logger';
@@ -13,6 +14,15 @@ export const URL_BASE = process.env.URL_BASE ?? 'http://localhost';
 dotenv.config();    
 
 const app = express()
+
+// Configuración de CORS
+app.use(cors({
+    origin: 'http://localhost:3000', // URL del frontend
+    credentials: true, // Permitir envío de cookies
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}))
+
 app.use(cookieParser())
 app.use(express.json()) // middleware que trasnforma la req.body en json
 app.use(requestLogger)

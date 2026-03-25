@@ -10,6 +10,7 @@ const User = new mongoose.Schema({
     authentication: {
         salt: { type: String, select: false },
         sessionToken: { type: String, select: false },
+        tokenExpiresAt: { type: Date, select: false },
         password: { type: String, required: true, select: false } 
     },
     createdAt: { type: Date, default: Date.now }
