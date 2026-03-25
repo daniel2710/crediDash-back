@@ -46,6 +46,12 @@ La búsqueda es **case-insensitive** (no distingue mayúsculas de minúsculas) y
       "phone": "string",
       "address": "string",
       "workspaceId": "string",
+      "lastLoan": {
+        "fecha_ultimo_prestamo": "2026-03-25T19:30:00.000Z",
+        "deuda_a_la_fecha": 5000,
+        "total_abonado": 3000,
+        "estado_prestamo": "partial"
+      },
       ...
     }
   ],
@@ -57,6 +63,16 @@ La búsqueda es **case-insensitive** (no distingue mayúsculas de minúsculas) y
   "items_on_page": 15
 }
 ```
+
+#### Campos del Objeto `lastLoan`
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `fecha_ultimo_prestamo` | Date | Fecha de creación del último préstamo del cliente |
+| `deuda_a_la_fecha` | number | Monto pendiente por pagar del préstamo |
+| `total_abonado` | number | Total pagado hasta la fecha del préstamo |
+| `estado_prestamo` | string | Estado actual del préstamo: `pending`, `liquidated`, `partial`, `late` |
+
+**Nota:** Si el cliente no tiene préstamos, el campo `lastLoan` será `null`.
 
 ### Errores Posibles
 

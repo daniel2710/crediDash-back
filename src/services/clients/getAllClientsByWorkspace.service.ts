@@ -1,5 +1,6 @@
 import { ClientSchema } from "../../schemas/clients";
 import { WorkspaceSchema } from "../../schemas/workspaces";
+import { LoansSchema } from "../../schemas/loans";
 import { buildPaginationUrls } from "../../helpers/buildPaginationUrls";
 
 export const findAllClientsByWorkspace = async (workspaceId: string, currentPage: number, limit: number, searchTerm?: string) => {
@@ -30,15 +31,34 @@ export const findAllClientsByWorkspace = async (workspaceId: string, currentPage
         throw new Error('There are no results on the current page.');
     }
 
+    const clientsWithLastLoan = await Promise.all(
+        clients.map(async (client) => {
+            const lastLoan = await LoansSchema.findOne({ clientId: client._id })
+                .sort({ createdAt: -1 })
+                .select('createdAt payment_missing payment_actual status')
+                .lean();
+
+            return {
+                ...client.toObject(),
+                lastLoan: lastLoan ? {
+                    fecha_ultimo_prestamo: lastLoan.createdAt,
+                    deuda_a_la_fecha: lastLoan.payment_missing,
+                    total_abonado: lastLoan.payment_actual,
+                    estado_prestamo: lastLoan.status
+                } : null
+            };
+        })
+    );
+
     const pagination: { next: string | null; previous: string | null; totalPages: number } = buildPaginationUrls(`clients/workspace/${workspaceId}`, currentPage, totalItems, limit);
 
     return {
-        clients,
+        clients: clientsWithLastLoan,
         current_page: currentPage,
         total_pages: pagination.totalPages,
         next: pagination.next,
         previous: pagination.previous,
         total_items: totalItems,
-        items_on_page: clients.length,
+        items_on_page: clientsWithLastLoan.length,
     };
 };
