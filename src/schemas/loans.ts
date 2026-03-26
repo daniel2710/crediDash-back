@@ -30,9 +30,9 @@ const Loans = new mongoose.Schema({
         default: 'pending',
         required: true
     },
-    description: { type: String, required: true },
+    description: { type: String, required: false },
     amount: { type: Number, required: true },
-    interest: { type: Number, required: true},
+    interest: { type: Number, required: false, default: 0 },
     installments_qty: { type: Number },
     installments_info: {
         paid_installments: { type: Number, required: true, default: 0 }, // total de cuotas pagadas
@@ -41,11 +41,11 @@ const Loans = new mongoose.Schema({
     history: [HistorySchema],
     payment_actual: { type: Number, required: true },
     payment_missing: { type: Number, required: true },
-    payment_method: {
+    payment_frequency: {
         type: String,
         enum: ['diary', 'weekly', 'fortnightly', 'monthly'],
-        default: 'diary',
-        required: true
+        default: null,
+        required: false
     },
     start_date: { type: Date, default: Date.now },
     createdAt: { type: Date, default: Date.now }

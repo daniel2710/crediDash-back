@@ -5,7 +5,7 @@ import { LoansSchema } from "../../schemas/loans";
 
 export const updateLoanById = async (req: Request, res: Response) => {
     const { workspaceId, loanId } = req.params; // ID del préstamo a actualizar
-    const { description, payment_method } = req.body; // Campos a actualizar
+    const { description, payment_frequency } = req.body; // Campos a actualizar
 
     try {
         // Validar que el loanId sea válido
@@ -44,7 +44,7 @@ export const updateLoanById = async (req: Request, res: Response) => {
 
         // Actualizar solo los campos recibidos en el cuerpo de la solicitud
         if (description) loan.description = description;
-        if (payment_method) loan.payment_method = payment_method;
+        if (payment_frequency) loan.payment_frequency = payment_frequency;
 
         // Guardar los cambios en el préstamo
         await loan.save();

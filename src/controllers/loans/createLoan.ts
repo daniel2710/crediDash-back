@@ -11,28 +11,47 @@ export const createLoan = async (req: Request, res: Response) => {
             clientId,
             status,
             description,
+            // monto
             amount,
+            // interes
             interest,
+            // cantidad de cuotas
             installments_qty,
-            payment_method,
+            // frecuencia de pago
+            payment_frequency,
+            // fecha de inicio
             start_date,
         } = req.body;
+
+        // Validar y establecer valor por defecto para status
+        const validStatuses = ['pending', 'liquidated', 'partial', 'late'];
+        const loanStatus = status || 'pending';
+        
+        if (!validStatuses.includes(loanStatus)) {
+            return res.status(400).json({
+                status: 'failed',
+                message: `Invalid status. Allowed values: ${validStatuses.join(', ')}`
+            });
+        }
+
+        // Establecer valor por defecto para interest
+        const loanInterest = interest !== undefined ? interest : 0;
+
+        // Validar y establecer payment_frequency si se proporciona
+        const validFrequencies = ['diary', 'weekly', 'fortnightly', 'monthly'];
+        if (payment_frequency && !validFrequencies.includes(payment_frequency)) {
+            return res.status(400).json({
+                status: 'failed',
+                message: `Invalid payment_frequency. Allowed values: ${validFrequencies.join(', ')}`
+            });
+        }
 
         // Validar campos obligatorios
         const missingFields = [];
         if (!workspaceId) missingFields.push('workspaceId');
         if (!clientId) missingFields.push('clientId');
-        if (!status) missingFields.push('status');
-        if (!description) missingFields.push('description');
         if (amount === undefined) missingFields.push('amount');
-        if (interest === undefined) missingFields.push('interest');
         if (installments_qty === undefined) missingFields.push('installments_qty');
-        if (
-            payment_method !== 'diary' &&
-            payment_method !== 'monthly' &&
-            payment_method !== 'weekly' &&
-            payment_method !== 'fortnightly'
-        ) missingFields.push('payment_method');
 
         if (missingFields.length > 0) {
             return res.status(400).json({
@@ -44,7 +63,7 @@ export const createLoan = async (req: Request, res: Response) => {
         // Validar que los campos numéricos tengan valores válidos
         const numericFields = {
             amount,
-            interest,
+            interest: loanInterest,
             installments_qty,
         };
 
@@ -91,7 +110,7 @@ export const createLoan = async (req: Request, res: Response) => {
         }
 
         // Calcular montos
-        const totalAmount = amount + amount * (interest / 100);
+        const totalAmount = amount + amount * (loanInterest / 100);
         const amountPerQuota = totalAmount / installments_qty;
 
         // Crear cuotas
@@ -103,29 +122,29 @@ export const createLoan = async (req: Request, res: Response) => {
             // Crear una nueva instancia de la fecha para evitar referencias compartidas
             const installmentDate = new Date(baseDate);
 
-            // Ajustar la fecha según el método de pago
-            switch (payment_method) {
-                case 'diary':
-                    installmentDate.setDate(baseDate.getDate() + i + 1); // Comienza desde el día siguiente
-                    break;
-                case 'weekly':
-                    installmentDate.setDate(baseDate.getDate() + (i + 1) * 7); // Comienza desde el día siguiente y se incrementa de 7 en 7 días
-                    break;
-                case 'fortnightly':
-                    installmentDate.setDate(baseDate.getDate() + (i + 1) * 15); // Comienza desde el día siguiente y se incrementa de 15 en 15 días
-                    break;
-                case 'monthly':
-                    installmentDate.setDate(baseDate.getDate() + (i + 1) * 30); // Comienza desde el día siguiente y se incrementa de 30 en 30 días
-                    break;
-                default:
-                    throw new Error(`Invalid payment method: ${payment_method}`);
+            // Ajustar la fecha según la frecuencia de pago (solo si se especifica)
+            if (payment_frequency) {
+                switch (payment_frequency) {
+                    case 'diary':
+                        installmentDate.setDate(baseDate.getDate() + i + 1); // Comienza desde el día siguiente
+                        break;
+                    case 'weekly':
+                        installmentDate.setDate(baseDate.getDate() + (i + 1) * 7); // Comienza desde el día siguiente y se incrementa de 7 en 7 días
+                        break;
+                    case 'fortnightly':
+                        installmentDate.setDate(baseDate.getDate() + (i + 1) * 15); // Comienza desde el día siguiente y se incrementa de 15 en 15 días
+                        break;
+                    case 'monthly':
+                        installmentDate.setDate(baseDate.getDate() + (i + 1) * 30); // Comienza desde el día siguiente y se incrementa de 30 en 30 días
+                        break;
+                }
             }
 
             installments.push({
                 status: 'pending',
                 amount: amountPerQuota,
                 payment_date: null,
-                end_date: new Date(installmentDate),
+                end_date: payment_frequency ? new Date(installmentDate) : null,
             });
         }
 
@@ -133,16 +152,16 @@ export const createLoan = async (req: Request, res: Response) => {
         const newLoan = new LoansSchema({
             workspaceId,
             clientId,
-            status,
+            status: loanStatus,
             description,
             amount,
-            interest,
+            interest: loanInterest,
             installments_qty,
             installments_info: { paid_installments: 0 },
             installments,
             payment_actual: 0,
             payment_missing: totalAmount,
-            payment_method,
+            payment_frequency: payment_frequency || null,
             start_date: start_date ? new Date(start_date) : new Date(),
         });
 
