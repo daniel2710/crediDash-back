@@ -49,9 +49,20 @@ export const getAllLoansByWorkspace = async (req: Request, res: Response) => {
         // Actualizar el estado de préstamos atrasados antes de obtenerlos
         await checkAndUpdateAllLateLoans(workspaceId);
 
-        // Obtener los préstamos asociados al workspace
-        const loans = await LoansSchema.find({ workspaceId }).populate("installments");
-        const paginatedResult = paginate(loans, currentPage, limit, 'loans');
+        // Obtener los préstamos asociados al workspace con info del cliente
+        const loans = await LoansSchema.find({ workspaceId })
+            .populate("installments")
+            .populate("clientId", "name lastname phone address");
+
+        // Transformar los préstamos para renombrar clientId a client
+        const loansWithClient = loans.map(loan => {
+            const loanObj = loan.toObject() as any;
+            loanObj.client = loanObj.clientId;
+            delete loanObj.clientId;
+            return loanObj;
+        });
+
+        const paginatedResult = paginate(loansWithClient, currentPage, limit, 'loans');
 
         // Respuesta con los resultados paginados
         const response = {

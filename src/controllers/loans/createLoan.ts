@@ -51,7 +51,7 @@ export const createLoan = async (req: Request, res: Response) => {
         if (!workspaceId) missingFields.push('workspaceId');
         if (!clientId) missingFields.push('clientId');
         if (amount === undefined) missingFields.push('amount');
-        if (installments_qty === undefined) missingFields.push('installments_qty');
+        // installments_qty es opcional - si no se proporciona, se creará sin cuotas definidas
 
         if (missingFields.length > 0) {
             return res.status(400).json({
@@ -61,11 +61,15 @@ export const createLoan = async (req: Request, res: Response) => {
         }
 
         // Validar que los campos numéricos tengan valores válidos
-        const numericFields = {
+        const numericFields: Record<string, number> = {
             amount,
             interest: loanInterest,
-            installments_qty,
         };
+
+        // Solo validar installments_qty si se proporciona
+        if (installments_qty !== undefined) {
+            numericFields.installments_qty = installments_qty;
+        }
 
         for (const [field, value] of Object.entries(numericFields)) {
             if (typeof value !== "number" || isNaN(value) || value < 0) {
@@ -74,6 +78,14 @@ export const createLoan = async (req: Request, res: Response) => {
                     message: `Invalid or missing numeric value for field: ${field}`,
                 });
             }
+        }
+
+        // Validar que installments_qty sea mayor a 0 si se proporciona
+        if (installments_qty !== undefined && installments_qty < 1) {
+            return res.status(400).json({
+                status: "failed",
+                message: "installments_qty must be at least 1",
+            });
         }
 
         // Validar que el workspaceId y clientId sea válido
@@ -111,41 +123,44 @@ export const createLoan = async (req: Request, res: Response) => {
 
         // Calcular montos
         const totalAmount = amount + amount * (loanInterest / 100);
-        const amountPerQuota = totalAmount / installments_qty;
 
-        // Crear cuotas
+        // Crear cuotas solo si se proporciona installments_qty
         const installments = [];
-        // Usar start_date si se proporciona, de lo contrario usar la fecha actual
-        const baseDate = start_date ? new Date(start_date) : new Date();
+        
+        if (installments_qty !== undefined && installments_qty > 0) {
+            const amountPerQuota = totalAmount / installments_qty;
+            // Usar start_date si se proporciona, de lo contrario usar la fecha actual
+            const baseDate = start_date ? new Date(start_date) : new Date();
 
-        for (let i = 0; i < installments_qty; i++) {
-            // Crear una nueva instancia de la fecha para evitar referencias compartidas
-            const installmentDate = new Date(baseDate);
+            for (let i = 0; i < installments_qty; i++) {
+                // Crear una nueva instancia de la fecha para evitar referencias compartidas
+                const installmentDate = new Date(baseDate);
 
-            // Ajustar la fecha según la frecuencia de pago (solo si se especifica)
-            if (payment_frequency) {
-                switch (payment_frequency) {
-                    case 'diary':
-                        installmentDate.setDate(baseDate.getDate() + i + 1); // Comienza desde el día siguiente
-                        break;
-                    case 'weekly':
-                        installmentDate.setDate(baseDate.getDate() + (i + 1) * 7); // Comienza desde el día siguiente y se incrementa de 7 en 7 días
-                        break;
-                    case 'fortnightly':
-                        installmentDate.setDate(baseDate.getDate() + (i + 1) * 15); // Comienza desde el día siguiente y se incrementa de 15 en 15 días
-                        break;
-                    case 'monthly':
-                        installmentDate.setDate(baseDate.getDate() + (i + 1) * 30); // Comienza desde el día siguiente y se incrementa de 30 en 30 días
-                        break;
+                // Ajustar la fecha según la frecuencia de pago (solo si se especifica)
+                if (payment_frequency) {
+                    switch (payment_frequency) {
+                        case 'diary':
+                            installmentDate.setDate(baseDate.getDate() + i + 1); // Comienza desde el día siguiente
+                            break;
+                        case 'weekly':
+                            installmentDate.setDate(baseDate.getDate() + (i + 1) * 7); // Comienza desde el día siguiente y se incrementa de 7 en 7 días
+                            break;
+                        case 'fortnightly':
+                            installmentDate.setDate(baseDate.getDate() + (i + 1) * 15); // Comienza desde el día siguiente y se incrementa de 15 en 15 días
+                            break;
+                        case 'monthly':
+                            installmentDate.setDate(baseDate.getDate() + (i + 1) * 30); // Comienza desde el día siguiente y se incrementa de 30 en 30 días
+                            break;
+                    }
                 }
-            }
 
-            installments.push({
-                status: 'pending',
-                amount: amountPerQuota,
-                payment_date: null,
-                end_date: payment_frequency ? new Date(installmentDate) : null,
-            });
+                installments.push({
+                    status: 'pending',
+                    amount: amountPerQuota,
+                    payment_date: null,
+                    end_date: payment_frequency ? new Date(installmentDate) : null,
+                });
+            }
         }
 
         // Crear el préstamo

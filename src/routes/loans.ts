@@ -6,7 +6,8 @@ import {
     getAllLoansByWorkspace,
     updateLoanById,
     payLoanAsLiquidated,
-    getUpcomingAndOverdueLoans
+    getUpcomingAndOverdueLoans,
+    deleteLoanById
 } from "../controllers/loans";
 
 export default (router: Router) =>{
@@ -16,4 +17,5 @@ export default (router: Router) =>{
     router.post('/loans', isAuthenticated, createLoan);
     router.post('/loans/liquidate', isAuthenticated, payLoanAsLiquidated);
     router.patch('/loans/:workspaceId/:loanId', isAuthenticated, updateLoanById);
+    router.delete('/loans/:workspaceId/:loanId', isAuthenticated, deleteLoanById);
 }   

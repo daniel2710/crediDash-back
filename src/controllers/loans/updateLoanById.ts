@@ -4,8 +4,8 @@ import { WorkspaceSchema } from "../../schemas/workspaces";
 import { LoansSchema } from "../../schemas/loans";
 
 export const updateLoanById = async (req: Request, res: Response) => {
-    const { workspaceId, loanId } = req.params; // ID del préstamo a actualizar
-    const { description, payment_frequency } = req.body; // Campos a actualizar
+    const { workspaceId, loanId } = req.params;
+    const { description, payment_frequency, amount, interest } = req.body;
 
     try {
         // Validar que el loanId sea válido
@@ -42,11 +42,91 @@ export const updateLoanById = async (req: Request, res: Response) => {
             });
         }
 
-        // Actualizar solo los campos recibidos en el cuerpo de la solicitud
-        if (description) loan.description = description;
-        if (payment_frequency) loan.payment_frequency = payment_frequency;
+        // Verificar si hay cuotas pagadas (liquidated o partial)
+        const hasPaidInstallments = loan.installments.some(
+            (inst: any) => inst.status === 'liquidated' || inst.status === 'partial'
+        );
 
-        // Guardar los cambios en el préstamo
+        // Validar payment_frequency si se proporciona
+        if (payment_frequency) {
+            const validFrequencies = ['diary', 'weekly', 'fortnightly', 'monthly'];
+            if (!validFrequencies.includes(payment_frequency)) {
+                return res.status(400).json({
+                    status: 'failed',
+                    message: `Invalid payment_frequency. Allowed values: ${validFrequencies.join(', ')}`
+                });
+            }
+        }
+
+        // Si hay cuotas pagadas, solo permitir actualizar descripción
+        if (hasPaidInstallments) {
+            if (amount !== undefined || interest !== undefined) {
+                return res.status(400).json({
+                    status: 'failed',
+                    message: 'Cannot modify amount or interest when installments have been paid. Only description can be updated.',
+                });
+            }
+            // Actualizar solo descripción y frecuencia
+            if (description) loan.description = description;
+            if (payment_frequency) loan.payment_frequency = payment_frequency;
+        } else {
+            // No hay cuotas pagadas, permitir modificar monto e interés
+            // Validar valores numéricos primero
+            if (amount !== undefined && (typeof amount !== "number" || isNaN(amount) || amount < 0)) {
+                return res.status(400).json({
+                    status: "failed",
+                    message: "Invalid amount value",
+                });
+            }
+            if (interest !== undefined && (typeof interest !== "number" || isNaN(interest) || interest < 0)) {
+                return res.status(400).json({
+                    status: "failed",
+                    message: "Invalid interest value",
+                });
+            }
+
+            const newAmount = amount !== undefined ? amount : loan.amount;
+            const newInterest = (interest !== undefined ? interest : (loan.interest ?? 0));
+
+            // Calcular totales y diferencias antes de modificar
+            const currentInterest = (loan.interest ?? 0);
+            const oldTotalAmount = loan.amount + loan.amount * (currentInterest / 100);
+            const newTotalAmount = newAmount + newAmount * (newInterest / 100);
+            const amountDifference = newTotalAmount - oldTotalAmount;
+            const amountDiff = amount !== undefined ? newAmount - loan.amount : 0;
+
+            // Actualizar montos
+            loan.amount = newAmount;
+            loan.interest = newInterest;
+            loan.payment_missing = Math.max(0, loan.payment_missing + amountDifference);
+
+            // Recalcular cuotas si existen
+            if (loan.installments && loan.installments.length > 0) {
+                const amountPerQuota = newTotalAmount / loan.installments.length;
+                loan.installments.forEach((inst: any) => {
+                    if (inst.status === 'pending') {
+                        inst.amount = amountPerQuota;
+                    }
+                });
+            }
+
+            // Actualizar otros campos
+            if (description) loan.description = description;
+            if (payment_frequency) loan.payment_frequency = payment_frequency;
+
+            // Actualizar estadísticas del workspace
+            await WorkspaceSchema.findByIdAndUpdate(
+                workspaceId,
+                {
+                    $inc: {
+                        "stats.total_lents": amountDiff,
+                        "stats.total_pending": amountDifference,
+                    },
+                },
+                { new: true }
+            );
+        }
+
         await loan.save();
 
         return res.status(200).json({
