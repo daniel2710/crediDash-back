@@ -8,6 +8,7 @@ const Client = new mongoose.Schema({
     phone: { type: String },
     address: { type: String },
     description: { type: String },
+    isArchived: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now }
 })
 

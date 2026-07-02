@@ -19,6 +19,13 @@ const HistorySchema = new mongoose.Schema({
     remaining_balance: { type: Number, required: true }, // Saldo restante tras el abono
     paid_installments: { type: Number, required: true }, // Cuotas liquidadas hasta este momento
     loan_status: { type: String, required: true }, // Estado del préstamo después del pago
+    paid_installment_ids: [{ type: mongoose.Schema.Types.ObjectId }], // IDs de las cuotas pagadas en esta transacción
+    installment_details: [{
+        installment_id: { type: mongoose.Schema.Types.ObjectId },
+        amount_paid: { type: Number },
+        previous_status: { type: String },
+        new_status: { type: String }
+    }] // Detalle de cada cuota afectada
 });
 
 const Loans = new mongoose.Schema({

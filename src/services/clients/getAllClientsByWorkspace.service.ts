@@ -3,7 +3,7 @@ import { WorkspaceSchema } from "../../schemas/workspaces";
 import { LoansSchema } from "../../schemas/loans";
 import { buildPaginationUrls } from "../../helpers/buildPaginationUrls";
 
-export const findAllClientsByWorkspace = async (workspaceId: string, currentPage: number, limit: number, searchTerm?: string) => {
+export const findAllClientsByWorkspace = async (workspaceId: string, currentPage: number, limit: number, searchTerm?: string, archived?: string) => {
     const workspace = await WorkspaceSchema.findById(workspaceId);
     if (!workspace) {
         throw new Error('Workspace not found');
@@ -12,6 +12,12 @@ export const findAllClientsByWorkspace = async (workspaceId: string, currentPage
     const skip = (currentPage - 1) * limit;
 
     const query: any = { workspaceId };
+
+    if (archived === 'true') {
+        query.isArchived = true;
+    } else if (archived === 'false') {
+        query.isArchived = { $ne: true };
+    }
 
     if (searchTerm) {
         query.$or = [
@@ -33,13 +39,20 @@ export const findAllClientsByWorkspace = async (workspaceId: string, currentPage
 
     const clientsWithLastLoan = await Promise.all(
         clients.map(async (client) => {
-            const lastLoan = await LoansSchema.findOne({ clientId: client._id })
-                .sort({ createdAt: -1 })
-                .select('createdAt payment_missing payment_actual status')
-                .lean();
+            const [lastLoan, activeLoansCount] = await Promise.all([
+                LoansSchema.findOne({ clientId: client._id })
+                    .sort({ createdAt: -1 })
+                    .select('createdAt payment_missing payment_actual status')
+                    .lean(),
+                LoansSchema.countDocuments({
+                    clientId: client._id,
+                    status: { $in: ['pending', 'partial', 'late'] }
+                })
+            ]);
 
             return {
                 ...client.toObject(),
+                has_active_loans: activeLoansCount > 0,
                 lastLoan: lastLoan ? {
                     fecha_ultimo_prestamo: lastLoan.createdAt,
                     deuda_a_la_fecha: lastLoan.payment_missing,

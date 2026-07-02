@@ -18,7 +18,17 @@ export const deleteClientById = async (clientId: string, userId: string) => {
         throw new Error('This workspace does not belong to this user');
     }
 
-    // Eliminar todos los préstamos asociados al cliente
+    // Verificar que el cliente no tenga préstamos activos
+    const activeLoansCount = await LoansSchema.countDocuments({
+        clientId: clientId,
+        status: { $in: ['pending', 'partial', 'late'] }
+    });
+
+    if (activeLoansCount > 0) {
+        throw new Error('Client has active loans and cannot be deleted');
+    }
+
+    // Eliminar todos los préstamos liquidados asociados al cliente
     await LoansSchema.deleteMany({ clientId: clientId });
 
     await ClientSchema.findByIdAndDelete(clientId);

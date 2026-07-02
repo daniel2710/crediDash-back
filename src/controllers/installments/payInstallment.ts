@@ -4,6 +4,134 @@ import { WorkspaceSchema } from "../../schemas/workspaces";
 import { LoansSchema } from "../../schemas/loans";
 import { checkAndUpdateLateStatus } from "../../helpers/checkLateStatus";
 
+// Función para procesar pagos estándar (lógica existente)
+const processStandardPayment = (paymentAmount: number, installments: any[]) => {
+    let extraPayment = paymentAmount;
+    const processedInstallments: any[] = [];
+    
+    for (let i = 0; i < installments.length; i++) {
+        const installment = installments[i];
+
+        // Procesar solo cuotas pendientes
+        if (installment.status === "liquidated") continue;
+        
+        // En pago estándar, procesar en orden estricto:
+        // 1. Si hay cuotas parciales, completarlas primero
+        // 2. Si no hay cuotas parciales, procesar la primera pendiente
+        if (installment.status === "partial" && installment.payment > 0) {
+            // Completar cuota parcial existente
+            const previousStatus = installment.status;
+            const paymentMissing = installment.amount - installment.payment;
+            let amountPaid = 0;
+
+            if (extraPayment >= paymentMissing) {
+                // Completar esta cuota parcial
+                amountPaid = paymentMissing;
+                installment.payment = installment.amount;
+                installment.payment_date = new Date();
+                installment.status = "liquidated";
+                extraPayment -= paymentMissing;
+            } else {
+                // Pago adicional a la cuota parcial
+                amountPaid = extraPayment;
+                installment.payment += extraPayment;
+                installment.payment_date = new Date();
+                installment.status = "partial";
+                extraPayment = 0;
+                break; // Salir del bucle porque el pago ya se procesó
+            }
+
+            // Registrar la cuota procesada
+            processedInstallments.push({
+                installment_id: installment._id,
+                amount_paid: amountPaid,
+                previous_status: previousStatus,
+                new_status: installment.status
+            });
+            continue; // Continuar al siguiente ciclo
+        }
+
+        // Si no hay cuotas parciales, procesar la primera cuota pendiente
+        if (installment.status === "pending") {
+            const previousStatus = installment.status;
+            const paymentMissing = installment.amount - installment.payment; // cuánto queda por pagar para liquidar esa cuota
+            let amountPaid = 0;
+
+            if (extraPayment >= paymentMissing) {
+                // Pago completo de esta cuota
+                amountPaid = paymentMissing;
+                installment.payment = installment.amount;
+                installment.payment_date = new Date();
+                installment.status = "liquidated";
+                extraPayment -= paymentMissing;
+            } else {
+                // Pago parcial de esta cuota
+                amountPaid = extraPayment;
+                installment.payment += extraPayment;
+                installment.payment_date = new Date();
+                installment.status = "partial";
+                extraPayment = 0;
+                break; // Salir del bucle porque el pago ya se procesó
+            }
+
+            // Registrar la cuota procesada
+            processedInstallments.push({
+                installment_id: installment._id,
+                amount_paid: amountPaid,
+                previous_status: previousStatus,
+                new_status: installment.status
+            });
+        }
+    }
+
+    return processedInstallments;
+};
+
+
+// Función para procesar pago de una cuota específica por ID
+const processSpecificInstallment = (installmentId: string, paymentAmount: number, installments: any[]) => {
+    const installment = installments.find(inst => inst._id.toString() === installmentId);
+    
+    if (!installment) {
+        throw new Error(`Installment with ID ${installmentId} not found`);
+    }
+    
+    if (installment.status === "liquidated") {
+        throw new Error(`Installment with ID ${installmentId} is already liquidated`);
+    }
+    
+    // Permitir completar cuotas parciales - solo validar que no esté liquidada
+    
+    const previousStatus = installment.status;
+    const paymentMissing = installment.amount - installment.payment;
+    
+    if (paymentAmount > paymentMissing) {
+        throw new Error(`Payment amount ${paymentAmount} exceeds the remaining balance ${paymentMissing} for this installment`);
+    }
+    
+    let amountPaid = paymentAmount;
+    
+    if (paymentAmount >= paymentMissing) {
+        // Liquidar la cuota
+        amountPaid = paymentMissing;
+        installment.payment = installment.amount;
+        installment.payment_date = new Date();
+        installment.status = "liquidated";
+    } else {
+        // Pago parcial
+        installment.payment += paymentAmount;
+        installment.payment_date = new Date();
+        installment.status = "partial";
+    }
+    
+    return [{
+        installment_id: installment._id,
+        amount_paid: amountPaid,
+        previous_status: previousStatus,
+        new_status: installment.status
+    }];
+};
+
 export const payInstallment = async (req: Request, res: Response) => {
 
     try {
@@ -11,12 +139,14 @@ export const payInstallment = async (req: Request, res: Response) => {
             loanId,
             workspaceId,
             paymentAmount,
+            installmentId,
         } = req.body;
 
         const missingFields = [];
         if (!loanId) missingFields.push('loanId');
         if (!workspaceId) missingFields.push('workspaceId');
-        if (typeof paymentAmount !== "number" || isNaN(paymentAmount) || paymentAmount < 0) missingFields.push('paymentAmount');
+        if (typeof paymentAmount !== "number" || isNaN(paymentAmount) || paymentAmount <= 0) missingFields.push('paymentAmount');
+        if (installmentId && typeof installmentId !== "string") missingFields.push('installmentId must be a string');
 
         if (missingFields.length > 0) {
             return res.status(400).json({
@@ -66,67 +196,72 @@ export const payInstallment = async (req: Request, res: Response) => {
             });
         }
 
+        // Validar que el monto de pago no exceda el saldo pendiente
+        if (paymentAmount > loan.payment_missing) {
+            return res.status(400).json({
+                status: "failed",
+                message: `Payment amount cannot exceed the remaining balance of ${loan.payment_missing}`,
+            });
+        }
+
+        // No se necesitan validaciones de isCustomPayment ya que se eliminó el parámetro
+
         // Verificar y actualizar el estado de cuotas atrasadas antes de procesar el pago
         const updatedLoan = await checkAndUpdateLateStatus(loanId);
 
         // Iterar sobre las cuotas pendientes (usar el préstamo actualizado)
-        let extraPayment = paymentAmount; // Cantidad a procesar (110.000)
         const installments = updatedLoan!.installments;
 
-        // Recorremos todas las cuotas (installments) de un préstamo, y si el pago es menor a la cuota, lo procesamos y se abona, queda con el status 'partial' y se acaba el bucle ya que no queda dinero (extraPayment) para la siguiente cuota. Si el pago es mayor a la cuota, lo procesamos y se abona, queda con el status 'liquidated' y sigue el bucle hasta que la siguiente cuota quede como 'liquidate' y no quede más dinero (extraPayment).
-        for (let i = 0; i < installments.length; i++) {
-            const installment = installments[i];
-
-            // Procesar solo cuotas pendientes
-            if (installment.status === "liquidated") continue;
-
-            const paymentMissing = installment.amount - installment.payment; // cuánto queda por pagar para liquidar esa cuota
-
-            if (extraPayment >= paymentMissing) {
-                // Pago completo de esta cuota
-                installment.payment = installment.amount;
-                installment.payment_date = new Date();
-                installment.status = "liquidated";
-                extraPayment -= paymentMissing;
-            } else if (extraPayment > 0) {
-                // Pago parcial de esta cuota
-                installment.payment += extraPayment;
-                installment.payment_date = new Date();
-                installment.status = "partial";
-                extraPayment = 0;
-                break; // Salir del bucle porque el pago ya se procesó
+        // Procesar el pago según el tipo (específico o estándar)
+        let processedInstallments: any[] = [];
+        
+        try {
+            if (installmentId) {
+                // Pago de cuota específica por ID
+                processedInstallments = processSpecificInstallment(installmentId, paymentAmount, installments);
             } else {
-                // Sin dinero para procesar, salir del bucle
-                break;
+                // Lógica estándar: procesar siguiente cuota pendiente en orden
+                processedInstallments = processStandardPayment(paymentAmount, installments);
             }
+        } catch (paymentError: any) {
+            return res.status(400).json({
+                status: "failed",
+                message: `Payment processing error: ${paymentError.message}`,
+            });
         }
 
-        // Actualizar el estado del préstamo
-        loan.payment_actual += paymentAmount;
-        loan.payment_missing -= paymentAmount;
+        // Actualizar el estado del préstamo (usar updatedLoan que tiene las cuotas modificadas)
+        updatedLoan!.payment_actual += paymentAmount;
+        updatedLoan!.payment_missing -= paymentAmount;
 
-        if (loan.payment_missing <= 0) {
-            loan.status = "liquidated";
-            loan.payment_missing = 0;
-        } else if (loan.payment_actual > 0) {
-            loan.status = "partial";
+        if (updatedLoan!.payment_missing <= 0) {
+            updatedLoan!.status = "liquidated";
+            updatedLoan!.payment_missing = 0;
+        } else if (updatedLoan!.payment_actual > 0) {
+            updatedLoan!.status = "partial";
         }
 
         // Incrementar la cantidad de cuotas pagadas
-        loan.installments_info!.paid_installments = installments.filter(
+        updatedLoan!.installments_info!.paid_installments = installments.filter(
             (inst) => inst.status === "liquidated"
         ).length;
 
         // Registrar la historia del pago con información detallada
-        loan.history.push({
+        const paidInstallmentIds = processedInstallments
+            .filter(inst => inst.new_status === "liquidated")
+            .map(inst => inst.installment_id);
+
+        updatedLoan!.history.push({
             payment_date: new Date(),
             payment: paymentAmount,
-            remaining_balance: loan.payment_missing,
-            paid_installments: loan.installments_info!.paid_installments,
-            loan_status: loan.status
+            remaining_balance: updatedLoan!.payment_missing,
+            paid_installments: updatedLoan!.installments_info!.paid_installments,
+            loan_status: updatedLoan!.status,
+            paid_installment_ids: paidInstallmentIds,
+            installment_details: processedInstallments
         });
 
-        await loan.save();
+        await updatedLoan!.save();
 
         // Actualizar las estadísticas en workspace.stats
         await WorkspaceSchema.findByIdAndUpdate(
@@ -135,11 +270,11 @@ export const payInstallment = async (req: Request, res: Response) => {
                 $inc: {
                     // Reducir los préstamos activos si el préstamo fue liquidado.
                     "stats.active_loans":
-                        loan.status === "liquidated" ? -1 : 0,
+                        updatedLoan!.status === "liquidated" ? -1 : 0,
 
                     // Aumentamos el total liquidado si el préstamo fue liquidado.
                     "stats.liquidate_loans":
-                        loan.status === "liquidated" ? 1 : 0,
+                        updatedLoan!.status === "liquidated" ? 1 : 0,
 
                     // Aumentamos los ingresos por el monto total pagado independiente si el préstamo fue liquidado o no.
                     "stats.total_incomes": paymentAmount,
@@ -154,7 +289,7 @@ export const payInstallment = async (req: Request, res: Response) => {
         return res.status(201).json({
             status: "success",
             message: "Payment processed successfully",
-            updatedLoan: loan,
+            updatedLoan: updatedLoan,
         });
 
     } catch (error) {

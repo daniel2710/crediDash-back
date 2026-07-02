@@ -9,6 +9,8 @@ export const getAllLoansByClient = async (req: Request, res: Response) => {
     const currentPage = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 15;
 
+    const { status, payment_frequency, start_date_from, start_date_to, search } = req.query;
+
     try {
         const { workspaceId, clientId } = req.params;
 
@@ -45,8 +47,42 @@ export const getAllLoansByClient = async (req: Request, res: Response) => {
             });
         }
 
+        // Validar status si se proporciona
+        const validStatuses = ['pending', 'liquidated', 'partial', 'late'];
+        if (status && !validStatuses.includes(status as string)) {
+            return res.status(400).json({
+                status: "failed",
+                message: `Invalid status filter. Allowed values: ${validStatuses.join(', ')}`,
+            });
+        }
+
+        // Validar payment_frequency si se proporciona
+        const validFrequencies = ['diary', 'weekly', 'fortnightly', 'monthly'];
+        if (payment_frequency && !validFrequencies.includes(payment_frequency as string)) {
+            return res.status(400).json({
+                status: "failed",
+                message: `Invalid payment_frequency filter. Allowed values: ${validFrequencies.join(', ')}`,
+            });
+        }
+
+        // Construir filtros dinámicos
+        const query: Record<string, any> = { clientId };
+
+        if (status) query.status = status;
+        if (payment_frequency) query.payment_frequency = payment_frequency;
+        if (start_date_from || start_date_to) {
+            query.start_date = {};
+            if (start_date_from) query.start_date.$gte = new Date(start_date_from as string);
+            if (start_date_to) query.start_date.$lte = new Date(start_date_to as string);
+        }
+
+        // Filtro de búsqueda por descripción del préstamo
+        if (search) {
+            query.description = new RegExp(search as string, 'i');
+        }
+
         // Buscar préstamos asociados al cliente
-        const loans = await LoansSchema.find({ clientId });
+        const loans = await LoansSchema.find(query);
         const paginatedResult = paginate(loans, currentPage, limit, 'loans');
 
         // Si no hay resultados en la página actual, devuelve un error

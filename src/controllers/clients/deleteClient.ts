@@ -28,6 +28,7 @@ export const deleteClient = async (req: Request, res: Response) => {
       if (errorMessage === 'Client not found') statusCode = 404;
       else if (errorMessage === 'Workspace not found') statusCode = 404;
       else if (errorMessage === 'This workspace does not belong to this user') statusCode = 403;
+      else if (errorMessage === 'Client has active loans and cannot be deleted') statusCode = 409;
 
       return res.status(statusCode).json({
         status: "failed",

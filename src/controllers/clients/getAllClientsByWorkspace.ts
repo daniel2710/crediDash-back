@@ -5,6 +5,7 @@ export const getAllClientsByWorkspace = async (req: Request, res: Response): Pro
     const currentPage = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 15;
     const searchTerm = req.query.search as string | undefined;
+    const archived = req.query.archived as string | undefined;
 
     try {
       const { workspaceId } = req.params;
@@ -16,7 +17,7 @@ export const getAllClientsByWorkspace = async (req: Request, res: Response): Pro
         });
       }
 
-      const result = await findAllClientsByWorkspace(workspaceId, currentPage, limit, searchTerm);
+      const result = await findAllClientsByWorkspace(workspaceId, currentPage, limit, searchTerm, archived);
   
       return res.status(200).json({
         status: 'success',
